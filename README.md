@@ -1,2 +1,5 @@
-# COVID-19-spread-visualization
-RShiny app to visualize spread
+# COVID-19 data visualization
+RShiny app to visualize distribution globally
+
+
+Data from JHU CSSE https://github.com/CSSEGISandData/COVID-19
