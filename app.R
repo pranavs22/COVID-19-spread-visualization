@@ -6,23 +6,25 @@
 #
 #    http://shiny.rstudio.com/
 #
+# Author: Pranav Sahasrabudhe
 library(shiny)
 library(dplyr)
 library(ggplot2)
 library(data.table)
 library(tidyr)
 library(readr)
+library(shinycssloaders)
 library(scales)
 library(httr)
+library(plotly)
+
+###################################################
 ## Read in the data
+###################################################
+confirmed<-fread("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
+recovered<-fread("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
+fatalities<-fread("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
 
-# confirmed<-fread("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
-confirmed<-fread("C:/corona/time_series_2019-ncov-Confirmed.csv")
-# recovered<-fread("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv")
-# fatalities<-fread("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
-
-# recovered<-fread("C:/corona/time_series_2019-ncov-Confirmed.csv")
-# fatalities<-fread("C:/corona/time_series_2019-ncov-Confirmed.csv")
 preprocess<-function(input_file){
     ## Convert from wide format to long format
     
@@ -47,22 +49,10 @@ recovered_country_list<-sort(unique(recovered$Country))
 fatalities<-preprocess(fatalities)
 fatalities_country_list<-sort(unique(fatalities$Country))
 
-# India<-confirmed_long %>% group_by(date) %>% group_by("Country") %>% filter(Country=="India") 
 
-
-# ggplot(India,mapping=aes(India$date,India$confirmed_cases))+
-#     geom_point()+
-#     theme(text=element_text(size=10),axis.text.x=element_text(angle = 90,hjust=1))+
-#           xlab("India")+
-#              ylab("cases")+
-#     theme_bw()+
-#         scale_x_datetime(breaks = "1 day")
-# dev.off()
-# Define UI for application that draws a histogram
-
-
+###################################################
 ## Shiny code starts here-
-
+###################################################
 ui <- fluidPage(
 
     # Application title
@@ -76,15 +66,15 @@ ui <- fluidPage(
             selectInput("country",
                         label = NULL,
                         choices = c("",confirmed_country_list),
-                        selected = "All Countries"),
-            hr(style = "border-color: #18BC9C;")
-            
+                        selected = "US"),
+            hr(style = "border-color: #18BC9C;"),
+            actionButton("submit","Submit"),
         ),
         mainPanel(
             tabsetPanel(id="tab",
-                         tabPanel("Confirmed",plotOutput("confirmed_graph")),
-                         tabPanel("Recovered",plotOutput("recovered_graph")),
-                         tabPanel("Fatalities",plotOutput("fatalities_graph"))
+                        tabPanel("Confirmed",withSpinner(ui_element = plotlyOutput("confirmed_graph"),type = 6)),
+                        tabPanel("Recovered",withSpinner(ui_element = plotlyOutput("recovered_graph"),type = 6)),
+                        tabPanel("Fatalities",withSpinner(ui_element = plotlyOutput("fatalities_graph"),type = 6))
            
         )
     )
@@ -92,69 +82,52 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output,session) {
-    plotData1=reactiveVal()
-    plotData2=reactiveVal()
-    plotData3=reactiveVal()
-    
-    observeEvent(input$country,print(input$country))
-    observe({
+    plotData1<-eventReactive(input$submit,{
 
-        updateSelectInput(session,"Country")    
-        # if (input$tab=="Confirmed"){
-        #     req(is.null(plotData1()))
-                selected_country<-confirmed %>% group_by(date) %>% group_by("Country") %>% filter(Country==input$country) 
-                plotData1(ggplot(selected_country,mapping=aes(selected_country$date,selected_country$confirmed_cases,xlab(input$country)))+
+        selected_country<-confirmed %>% group_by(date) %>% group_by("Country") %>% filter(Country==input$country)
+        if (input$tab=="Confirmed"){
+            p<-ggplot(selected_country,mapping=aes(selected_country$date,selected_country$confirmed_cases))+
                     geom_point()+
-                    geom_line()+
                     xlab(input$country)+
                     ylab("Confirmed cases")+
-                    theme_bw()+
-                    theme(axis.text.x =element_text(size=10,angle = 90),
-                          axis.text.y =element_text(size=20),
-                          axis.title.x = element_text(size=20),
-                          axis.title.y = element_text(size=20))+
+                    theme_bw()
+            p<-ggplotly(p)
+            p
+            }
+        })
+        plotData2<-eventReactive(input$submit,{
+            if (input$tab=="Recovered"){
+                    # req(is.null(plotData2()))
+                    selected_country<-recovered %>% group_by(date) %>% group_by("Country") %>% filter(Country==input$country)
+                    p<-ggplot(selected_country,mapping=aes(selected_country$date,selected_country$confirmed_cases))+
+                        geom_point()+
+                        xlab(input$country)+
+                        ylab("Recovered cases")+
+                        theme_bw()
+                    p<-ggplotly(p)
+                    p
+            }
+        })
                     
-                    scale_x_datetime(breaks = "1 day"))
-        # } 
-        
-         if (input$tab=="Recovered"){
-            req(is.null(plotData2()))
-            selected_country<-recovered %>% group_by(date) %>% group_by("Country") %>% filter(Country==input$country) 
-            plotData2(ggplot(selected_country,mapping=aes(selected_country$date,selected_country$confirmed_cases,xlab(input$country)))+
-                geom_point()+
-                geom_line()+
-                xlab(input$country)+
-                ylab("Recovered cases")+
-                theme_bw()+
-                theme(axis.text.x =element_text(size=10,angle = 90),
-                      axis.text.y =element_text(size=20),
-                      axis.title.x = element_text(size=20),
-                      axis.title.y = element_text(size=20))+
-                scale_x_datetime(breaks = "1 day"))
-
-        } else if (input$tab=="Fatalities"){    
-            req(is.null(plotData3()))
+    plotData3<-eventReactive(input$submit,{
+        if (input$tab=="Fatalities"){
             selected_country<-fatalities %>% group_by(date) %>% group_by("Country") %>% filter(Country==input$country) 
-            
-            
-            plotData3(ggplot(selected_country,mapping=aes(selected_country$date,selected_country$confirmed_cases,xlab(input$country)))+
+            p<-ggplot(selected_country,mapping=aes(selected_country$date,selected_country$confirmed_cases,))+
                 geom_point()+
-                geom_line()+
                 xlab(input$country)+
                 ylab("Fatalities")+
-                theme_bw()+
-                theme(axis.text.x =element_text(size=10,angle = 90),
-                      axis.text.y =element_text(size=20),
-                      axis.title.x = element_text(size=20),
-                      axis.title.y = element_text(size=20))+
-                
-                scale_x_datetime(breaks = "1 day"))
+                theme_bw()
+            p<-ggplotly(p)
+            p
         }
-        
     })
-    output$confirmed_graph=renderPlot({plot(plotData1())})
-    output$recovered_graph=renderPlot({plot(plotData2())})
-    output$fatalities_graph=renderPlot({plot(plotData3())})
+
+    
+    output$confirmed_graph<-renderPlotly({plotData1()})
+    output$recovered_graph<-renderPlotly({plotData2()})
+    output$fatalities_graph<-renderPlotly({plotData3()})
+    
+    
 }
 
 # Run the application 
